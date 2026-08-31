@@ -1,0 +1,17 @@
+{
+  "name": "ダーツ フォーム再現度チェック",
+  "short_name": "ダーツ分析",
+  "description": "3投の動画からフォームの再現度を分析し、4スタンス理論に基づく改善ヒントを提案",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#2C4A6E",
+  "theme_color": "#2C4A6E",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
