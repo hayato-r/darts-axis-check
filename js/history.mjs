@@ -1,8 +1,9 @@
 /**
  * セッション履歴(端末内 localStorage のみ・送信なし)
  *
- * 「軸の安定度」を一回の測定で終わらせず、セッションをまたいだ推移として
+ * 「3投の再現度」を一回の測定で終わらせず、セッションをまたいだ推移として
  * 見せるための最小限の記録。サーバーは使わず、この端末のブラウザにだけ残る。
+ * (2026-08-31〜11-24 の記録には axis_score / axis_level / player_type も入っているが、今は使っていない)
  */
 
 const KEY = "darts_session_history_v1";
@@ -23,9 +24,6 @@ export function appendSessionToHistory(result) {
   history.push({
     ts: Date.now(),
     reproducibility: result.reproducibility,
-    axis_score: result.axis_stability.score_pct,
-    axis_level: result.axis_stability.level,
-    player_type: result.player_type,
     coarse_type: result.coarse_type?.verdict ?? null,
   });
   while (history.length > MAX_ENTRIES) history.shift();

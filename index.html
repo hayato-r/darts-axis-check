@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>ダーツ フォーム再現度チェック</title>
-  <meta name="description" content="3投の動画からフォームの再現度を分析し、4スタンス理論に基づく改善ヒントを提案します。動画は端末の外に送信されません。">
+  <meta name="description" content="3投の動画からフォームの再現度を分析し、改善ヒントと練習ドリルを提案します。動画は端末の外に送信されません。">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#2C4A6E">
   <link rel="stylesheet" href="css/style.css">
@@ -21,7 +21,7 @@
       <p>正しく分析するには撮り方が大事です。3つだけ守ってください:</p>
       <ol class="guide-list">
         <li><b>真横から撮る</b> — あなたの<b>利き手側</b>に立って、真横(サイドビュー)から。正面・背面はNG</li>
-        <li><b>全身を入れる</b> — 頭から足元まで。足が映ると体軸の安定性まで分析できます</li>
+        <li><b>全身を入れる</b> — 頭から足元まで。足元まで映ると、体や軸足のブレまで分析できます</li>
         <li><b>3投を連続で投げる</b> — ダーツを抜きに行くのは3投終わってから(歩く動作は自動で除外されます)</li>
       </ol>
       <p class="note">動画は30秒〜1分程度がおすすめ。スマホは横向き推奨。</p>
@@ -36,16 +36,6 @@
       <p>3投を撮影した動画を選んでください(その場で撮影もできます)。</p>
       <div id="error-box" class="error" hidden></div>
       <button id="btn-debug" class="btn ghost" hidden>🐞 解析データを保存(デバッグ用)</button>
-
-      <label class="field-label" for="player-type">あなたの4スタンスタイプ(わかれば)</label>
-      <select id="player-type">
-        <option value="">わからない(一般的なヒントを表示)</option>
-        <option value="A1">A1(つま先・内側 — 前腕主導のスイング)</option>
-        <option value="A2">A2(つま先・外側 — コンパクトなスイング)</option>
-        <option value="B1">B1(かかと・内側 — 押し出すプッシュ)</option>
-        <option value="B2">B2(かかと・外側 — 体重移動の大きいプッシュ)</option>
-      </select>
-      <p class="note">タイプがわからなくても大丈夫。分析結果に「プッシュ系/スイング系」の傾向が表示されます。</p>
 
       <label class="btn primary file-btn">
         📹 動画を選択 / 撮影
@@ -78,7 +68,7 @@
         <li>投擲動作の通り道に<b>障害物</b>はありませんか?</li>
         <li><b>全身</b>(特に足元)が映っていますか?</li>
       </ul>
-      <p class="note">このまま解析すると、判定の精度が下がる可能性があります。</p>
+      <p class="note">このまま解析すると、分析の精度が下がる可能性があります。</p>
       <button id="btn-precheck-continue" class="btn primary">このまま解析する</button>
       <button id="btn-precheck-retry" class="btn ghost">動画を選び直す</button>
     </section>
@@ -91,10 +81,10 @@
       <button id="btn-share" class="btn primary">📤 レポート画像を保存 / シェア</button>
       <button id="btn-retry" class="btn ghost">もう一度分析する</button>
     </section>
-    <footer class="app-footer">ダーツフォーム分析 — Claude Code × MediaPipe(4スタンス理論ベース)</footer>
+    <footer class="app-footer">ダーツフォーム分析 — Claude Code × MediaPipe</footer>
   </div>
 
   <!-- ?v= はキャッシュバスター。js/ 配下を変更したら main.mjs の APP_VERSION と合わせて全 import の ?v= を上げること -->
-  <script type="module" src="js/main.mjs?v=2026-08-31.6"></script>
+  <script type="module" src="js/main.mjs?v=2026-11-25.1"></script>
 </body>
 </html>

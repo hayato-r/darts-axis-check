@@ -493,38 +493,8 @@ export function buildRanking(variance) {
   return ranking;
 }
 
-// ---------------------------------------------------------------- 軸の安定度(headline指標)
-
-const AXIS_METRICS = ["trunk_drift", "head_drift", "back_foot_drift"];
-const LEVEL_RANK = { green: 0, yellow: 1, red: 2 };
-
-/**
- * 3つの体軸系指標(胴体中心・頭部・軸足)を1つの headline スコアにまとめる。
- * score = sd / red閾値(既存ranking と同じ考え方)。1.5 でキャップするのは、
- * 閾値ちょうど(score=1)でも 0% にはせず「際どいが0ではない」感触を残すため
- * (1.5 キャップ時: score=1→約33%, score=1.5以上→0%)。
- */
-export function computeAxisStability(variance) {
-  const scores = [];
-  const components = {};
-  let worstLevel = null;
-  for (const metric of AXIS_METRICS) {
-    const sd = representativeSd(metric, variance);
-    const level = evaluateMetric(metric, sd);
-    components[metric] = { sd, level };
-    if (sd != null) {
-      scores.push(Math.min(sd / THRESHOLDS[metric][1], 1.5));
-      if (worstLevel == null || LEVEL_RANK[level] > LEVEL_RANK[worstLevel]) worstLevel = level;
-    }
-  }
-  if (!scores.length) return { score_pct: null, level: "unknown", components };
-  const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
-  return {
-    score_pct: round(Math.max(0, 100 * (1 - avgScore / 1.5)), 1),
-    level: worstLevel,
-    components,
-  };
-}
+// 「軸の安定度」(胴体・頭部・軸足を1つにまとめた見出しスコア)は 2026-11-25 に廃止。
+// 3つの指標は ranking・詳細指標の中で、ほかの指標と同じように個別に評価する。
 
 // ---------------------------------------------------------------- セッション組み立て
 
@@ -715,6 +685,5 @@ export function analyzeSession(data, { playerType = null } = {}) {
     throws,
     variance,
     ranking: buildRanking(variance),
-    axis_stability: computeAxisStability(variance),
   };
 }

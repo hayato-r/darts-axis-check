@@ -2,10 +2,11 @@
  * レポート描画(DOM)+ シェア画像生成(Canvas 1080×1080)
  */
 
-import { THRESHOLDS, METRIC_LABELS, evaluateMetric, CAPTURE_QUALITY_THRESHOLDS } from "./analysis.mjs?v=2026-08-31.6";
-import { pickHint, pickDrill } from "./hints.mjs?v=2026-08-31.5";
+import { THRESHOLDS, METRIC_LABELS, evaluateMetric, CAPTURE_QUALITY_THRESHOLDS } from "./analysis.mjs?v=2026-11-25.1";
+import { pickHint, pickDrill, pickDrillTip } from "./hints.mjs?v=2026-11-25.1";
 
-const AXIS_METRIC_SET = new Set(["trunk_drift", "head_drift", "back_foot_drift"]);
+// 2026-11-25: 「軸の安定度」の見出し・🧭マークと、4スタンス理論の表記(タイプ名・判定結果)を画面から削除。
+// 見出しは「3投の再現度」。タイプ別の内容は、ドリルの「コツ」の出し分けにだけ使う(判定結果は表示しない)。
 
 const LEVEL = {
   green: { mark: "🟢", word: "安定", color: "#7FC8A9" },
@@ -24,40 +25,33 @@ function reproComment(score) {
   return "3投の形がバラついています。まずはテンポとテイクバック位置から。";
 }
 
-function axisComment(level) {
-  if (level == null) return "軸の安定度を計算するデータが不足しています(全身が映るように撮影すると計測できます)。";
-  if (level === "green") return "軸が安定しています。この感覚を忘れないうちに次のセッションでも確認しましょう。";
-  if (level === "yellow") return "軸がやや不安定です。下の改善ヒントを1つずつ試してみましょう。";
-  return "軸が不安定です。まずは下の最優先ヒントから、次のセッションで意識してみましょう。";
-}
-
 const r1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
 
-/** 過去セッションとの比較(推移)セクションのHTML */
-function renderTrendSection(axis, pastHistory) {
+/** 過去セッションとの比較(推移)セクションのHTML。3投の再現度で比べる */
+function renderTrendSection(currentScore, pastHistory) {
   if (!pastHistory || !pastHistory.length) {
     return `<p class="note">これが最初の記録です。次回以降、ここに前回との比較が表示されます。</p>`;
   }
   const prev = pastHistory[pastHistory.length - 1];
   let deltaHtml = "";
-  if (prev.axis_score != null && axis.score_pct != null) {
-    const d = r1(axis.score_pct - prev.axis_score);
+  if (prev.reproducibility != null && currentScore != null) {
+    const d = r1(currentScore - prev.reproducibility);
     const cls = d > 0 ? "up" : d < 0 ? "down" : "flat";
     const arrow = d > 0 ? "▲" : d < 0 ? "▼" : "→";
     const sign = d > 0 ? "+" : "";
     deltaHtml = `<div class="trend-delta ${cls}">前回比 ${arrow} ${sign}${d}pt</div>`;
   }
-  const series = [...pastHistory, { axis_score: axis.score_pct, current: true }].slice(-8);
+  const series = [...pastHistory, { reproducibility: currentScore, current: true }].slice(-8);
   const maxBarH = 44;
   const barsHtml = series.map((h) => {
-    const v = h.axis_score;
+    const v = h.reproducibility;
     const height = v == null ? 4 : Math.max(4, (v / 100) * maxBarH);
     return `<div class="trend-bar${h.current ? " current" : ""}" style="height:${height}px" title="${v == null ? "--" : v + "%"}"></div>`;
   }).join("");
   return `
     ${deltaHtml}
     <div class="trend-bars">${barsHtml}</div>
-    <p class="note">直近${series.length}回の軸スコア推移(右端が今回、濃い色が現在)</p>
+    <p class="note">直近${series.length}回の再現度の推移(右端が今回、濃い色が現在)</p>
   `;
 }
 
@@ -84,9 +78,10 @@ function renderVideoSection(result, videoUrl) {
 /** 分析結果 → レポートHTML(文字列)。pastHistory は今回より前のセッション記録(古い順) */
 export function renderReport(result, pastHistory = [], videoUrl = null) {
   const q = result.capture_quality;
-  const type = result.player_type;
-  const coarse = result.coarse_type;
+  // 自動判定("A"=スイング系 / "B"=プッシュ系 / "unknown")。画面には出さず、ドリルのコツの出し分けにだけ使う
+  const verdict = result.coarse_type?.verdict ?? null;
   const n = result.throws.length;
+  const repro = result.reproducibility;
 
   const top3 = result.ranking.slice(0, 3);
   const unstable = top3.filter((r) => r.level === "red" || r.level === "yellow");
@@ -112,36 +107,32 @@ export function renderReport(result, pastHistory = [], videoUrl = null) {
   const drillHtml = (metric) => {
     const d = pickDrill(metric);
     if (!d) return "";
+    const tip = pickDrillTip(metric, verdict);
     return `
       <div class="drill">
         <div class="drill-head">🏋️ ドリル</div>
         <p>${d.action}</p>
-        <div class="drill-meta">${d.reps} → 📅 ${d.retest_days}日後にもう一度撮影して、軸スコアの変化を確認しましょう</div>
+        ${tip ? `<p class="drill-tip">💡 ${tip}</p>` : ""}
+        <div class="drill-meta">${d.reps} → 📅 ${d.retest_days}日後にもう一度撮影して、再現度の変化を確認しましょう</div>
       </div>`;
   };
 
   const hintsHtml = unstable.length
     ? unstable.map((r, i) => `
         <div class="hint">
-          <div class="hint-head">${i + 1}. ${AXIS_METRIC_SET.has(r.metric) ? "🧭 " : ""}${r.label_jp} ${LEVEL[r.level].mark}${i === 0 && r.level === "red" ? "(最優先)" : ""}</div>
-          <p>${pickHint(r.metric, type)}</p>
+          <div class="hint-head">${i + 1}. ${r.label_jp} ${LEVEL[r.level].mark}${i === 0 && r.level === "red" ? "(最優先)" : ""}</div>
+          <p>${pickHint(r.metric, null)}</p>
           ${drillHtml(r.metric)}
         </div>`).join("")
     : `<div class="hint"><div class="hint-head">🎉 全指標が安定しています</div>
        <p>素晴らしい再現性です。この感覚を忘れないうちに、同じ条件でもう1セッション記録しておきましょう。</p></div>`;
 
-  const coarseHtml = coarse && coarse.verdict !== "unknown"
-    ? `あなたの投げ方は <b>${coarse.verdict === "B" ? "プッシュ系(Bタイプ傾向)" : "スイング系(Aタイプ傾向)"}</b> に見えます(縦横比 ${fmt(coarse.ratio_median, 2)})`
-    : "投げ方の系統は判定保留(プッシュ/スイングの中間域)";
-
-  const axis = result.axis_stability;
   return `
     <section class="score-card">
-      <div class="score-label">🧭 軸の安定度</div>
-      <div class="score-value">${axis.score_pct == null ? "--" : fmt(axis.score_pct, 0)}<span class="score-unit">${axis.score_pct == null ? "" : "%"}</span></div>
-      <div class="score-comment">${axisComment(axis.level)}</div>
-      <div class="trend-section">${renderTrendSection(axis, pastHistory)}</div>
-      <div class="score-sub">3投の再現度: <b>${fmt(result.reproducibility, 1)}%</b> — ${reproComment(result.reproducibility)}</div>
+      <div class="score-label">🎯 3投の再現度</div>
+      <div class="score-value">${repro == null ? "--" : fmt(repro, 1)}<span class="score-unit">${repro == null ? "" : "%"}</span></div>
+      <div class="score-comment">${repro == null ? "再現度を計算するデータが不足しています。" : reproComment(repro)}</div>
+      <div class="trend-section">${renderTrendSection(repro, pastHistory)}</div>
     </section>
 
     ${renderVideoSection(result, videoUrl)}
@@ -150,12 +141,11 @@ export function renderReport(result, pastHistory = [], videoUrl = null) {
       <h2>サマリ</h2>
       <ul class="summary">
         <li>解析投擲数: <b>${n}投</b>(ノイズ除外 ${result.noise_excluded_frames.length}件)</li>
-        <li>${coarseHtml}${type ? ` / 選択タイプ: <b>${type}</b>` : " / タイプ未選択(一般ヒントを表示)"}</li>
         <li>投擲間隔: 平均 ${fmt(v.throw_interval.mean_sec, 1)}秒(SD ±${fmt(v.throw_interval.sd_sec, 1)}秒)</li>
         <li class="quality">撮影品質:
           サイドビュー ${(q.shoulder_x_diff ?? 0) >= CAPTURE_QUALITY_THRESHOLDS.shoulder_x_diff ? "✅" : "⚠️"} /
           検出率 ${Math.round((q.detection_rate ?? 0) * 100)}% ${(q.detection_rate ?? 0) >= CAPTURE_QUALITY_THRESHOLDS.detection_rate ? "✅" : "⚠️"} /
-          足元 ${(q.foot_visibility ?? 0) >= CAPTURE_QUALITY_THRESHOLDS.foot_visibility ? "✅" : "⚠️ 未検出(全身を映すと体軸も評価できます)"}
+          足元 ${(q.foot_visibility ?? 0) >= CAPTURE_QUALITY_THRESHOLDS.foot_visibility ? "✅" : "⚠️ 未検出(全身を映すと、体や軸足のブレも評価できます)"}
         </li>
       </ul>
     </section>
@@ -164,7 +154,7 @@ export function renderReport(result, pastHistory = [], videoUrl = null) {
       <h2>バラツキ要因 Top 3</h2>
       ${top3.map((r) => `
         <div class="bar-row">
-          <div class="bar-label">${AXIS_METRIC_SET.has(r.metric) ? "🧭 " : ""}${r.label_jp}</div>
+          <div class="bar-label">${r.label_jp}</div>
           <div class="bar-track">
             <div class="bar-fill" style="width:${Math.min(r.score, 1.2) / 1.2 * 100}%; background:${LEVEL[r.level].color}"></div>
           </div>
@@ -174,7 +164,7 @@ export function renderReport(result, pastHistory = [], videoUrl = null) {
     </section>
 
     <section class="card">
-      <h2>改善ヒント${type ? `(${type}タイプ向け)` : "(一般)"}</h2>
+      <h2>改善ヒント</h2>
       ${hintsHtml}
     </section>
 
@@ -185,7 +175,7 @@ export function renderReport(result, pastHistory = [], videoUrl = null) {
         <thead><tr><th>指標</th>${result.throws.map((_, i) => `<th>${i + 1}投目</th>`).join("")}<th>SD</th><th>評価</th></tr></thead>
         <tbody>
           ${rows.map(([label, vals, sd, metric]) => `
-            <tr><td>${AXIS_METRIC_SET.has(metric) ? "🧭 " : ""}${label}</td>
+            <tr><td>${label}</td>
               ${vals.map((x) => `<td>${fmt(x)}</td>`).join("")}
               <td>${fmt(sd)}</td>
               <td>${LEVEL[evaluateMetric(metric, sd)].mark}</td></tr>`).join("")}
@@ -210,24 +200,18 @@ export function renderShareImage(result) {
 
   // タイトル
   ctx.fillStyle = TEXT; ctx.font = jp(52, "bold");
-  ctx.fillText("ダーツ 軸の安定度レポート", 72, 110);
+  ctx.fillText("ダーツ フォーム再現度レポート", 72, 110);
   ctx.fillStyle = SUB; ctx.font = jp(30);
   const date = new Date().toISOString().slice(0, 10);
-  const typeStr = result.player_type ? ` / タイプ: ${result.player_type}` : "";
-  ctx.fillText(`${date} / ${result.throws.length}投セッション${typeStr}`, 72, 165);
+  ctx.fillText(`${date} / ${result.throws.length}投セッション`, 72, 165);
 
-  // 軸の安定度スコア(大、headline)
-  const axis = result.axis_stability;
+  // 3投の再現度(大、headline)。色の境目は reproComment と同じ(85% / 70%)
+  const repro = result.reproducibility;
   ctx.fillStyle = TEXT; ctx.font = jp(40, "bold");
-  ctx.fillText("🧭 軸の安定度", 72, 300);
+  ctx.fillText("🎯 3投の再現度", 72, 300);
   ctx.font = `bold 170px "Hiragino Sans", sans-serif`;
-  const axisScore = axis.score_pct;
-  ctx.fillStyle = axisScore >= 70 ? "#7FC8A9" : axisScore >= 40 ? YELLOW : "#E76F51";
-  ctx.fillText(`${axisScore?.toFixed(0) ?? "--"}%`, 72, 470);
-
-  // 再現度スコア(補足・小さめ)
-  ctx.fillStyle = SUB; ctx.font = jp(28);
-  ctx.fillText(`3投の再現度: ${result.reproducibility?.toFixed(1) ?? "--"}%`, 72, 510);
+  ctx.fillStyle = repro == null ? SUB : repro >= 85 ? "#7FC8A9" : repro >= 70 ? YELLOW : "#E76F51";
+  ctx.fillText(`${repro?.toFixed(1) ?? "--"}%`, 72, 470);
 
   // Top3 バー
   ctx.fillStyle = TEXT; ctx.font = jp(36, "bold");
@@ -251,7 +235,7 @@ export function renderShareImage(result) {
   const head = unstable.length ? `今日の一手 — ${unstable[0].label_jp}` : "今日の一手";
   ctx.fillText(head, 72, 950);
   const hint = unstable.length
-    ? pickHint(unstable[0].metric, result.player_type)
+    ? pickHint(unstable[0].metric, null)
     : "全指標が安定しています。この感覚を大切に。";
   ctx.fillStyle = TEXT; ctx.font = jp(26);
   wrapText(ctx, hint, 72, 990, W - 144, 38, 2);

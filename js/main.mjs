@@ -3,14 +3,14 @@
  * 動画選択 → 骨格推定(オンデバイス) → 分析 → レポート表示 → シェア画像
  */
 
-import { extractKeypoints, loadPoseLandmarker } from "./pose.mjs?v=2026-08-31.6";
-import { analyzeSession, computeQuickCaptureQuality, captureQualityIssues } from "./analysis.mjs?v=2026-08-31.6";
-import { renderReport, renderShareImage } from "./report.mjs?v=2026-08-31.6";
-import { loadHistory, appendSessionToHistory } from "./history.mjs?v=2026-08-31.6";
+import { extractKeypoints, loadPoseLandmarker } from "./pose.mjs?v=2026-11-25.1";
+import { analyzeSession, computeQuickCaptureQuality, captureQualityIssues } from "./analysis.mjs?v=2026-11-25.1";
+import { renderReport, renderShareImage } from "./report.mjs?v=2026-11-25.1";
+import { loadHistory, appendSessionToHistory } from "./history.mjs?v=2026-11-25.1";
 
 // 古いキャッシュ版が動いていないか画面上で確認するためのビルド版数。
 // js/ 配下を変更したら必ず上げること。
-export const APP_VERSION = "2026-08-31.6";
+export const APP_VERSION = "2026-11-25.1";
 
 // プリチェックで先頭何秒だけ見るか。短すぎると判定が不安定、長すぎると
 // 「軽量」の意味がなくなるため、3投を撮り始める前の構えが映る程度を想定
@@ -80,8 +80,8 @@ async function runPipeline(file) {
 
     setProgress(92, "3投を検出してバラツキを計算中…");
     state.lastKeypoints = data;
-    const playerType = $("player-type").value || null;
-    const result = analyzeSession(data, { playerType });
+    // タイプを選ぶ欄は 2026-11-25 に廃止。ドリルのコツの出し分けは、動画からの自動判定(coarse_type)だけで行う
+    const result = analyzeSession(data, { playerType: null });
 
     if (result.error) {
       show("screen-input");
