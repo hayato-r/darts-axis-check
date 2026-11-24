@@ -75,8 +75,9 @@ function seekTo(video, t) {
  * 動画ファイル → keypoints データ
  * @param {File} file 動画ファイル
  * @param {(done:number, total:number)=>void} onProgress 進捗コールバック
+ * @param {{maxSeconds?: number}} opts maxSeconds指定時は動画の先頭だけを処理する(軽量プリチェック用)
  */
-export async function extractKeypoints(file, onProgress = () => {}) {
+export async function extractKeypoints(file, onProgress = () => {}, { maxSeconds = null } = {}) {
   const landmarker = await loadPoseLandmarker();
 
   const video = document.createElement("video");
@@ -121,8 +122,9 @@ export async function extractKeypoints(file, onProgress = () => {}) {
       throw new Error("動画が長すぎます(2分以内にしてください)");
     }
 
+    const effectiveDuration = maxSeconds != null ? Math.min(duration, maxSeconds) : duration;
     const step = 1 / TARGET_FPS;
-    const total = Math.floor(duration * TARGET_FPS);
+    const total = Math.floor(effectiveDuration * TARGET_FPS);
     const frames = [];
 
     for (let i = 0; i < total; i++) {

@@ -2,7 +2,7 @@
  * レポート描画(DOM)+ シェア画像生成(Canvas 1080×1080)
  */
 
-import { THRESHOLDS, METRIC_LABELS, evaluateMetric } from "./analysis.mjs?v=2026-08-31.5";
+import { THRESHOLDS, METRIC_LABELS, evaluateMetric, CAPTURE_QUALITY_THRESHOLDS } from "./analysis.mjs?v=2026-08-31.6";
 import { pickHint, pickDrill } from "./hints.mjs?v=2026-08-31.5";
 
 const AXIS_METRIC_SET = new Set(["trunk_drift", "head_drift", "back_foot_drift"]);
@@ -153,9 +153,9 @@ export function renderReport(result, pastHistory = [], videoUrl = null) {
         <li>${coarseHtml}${type ? ` / 選択タイプ: <b>${type}</b>` : " / タイプ未選択(一般ヒントを表示)"}</li>
         <li>投擲間隔: 平均 ${fmt(v.throw_interval.mean_sec, 1)}秒(SD ±${fmt(v.throw_interval.sd_sec, 1)}秒)</li>
         <li class="quality">撮影品質:
-          サイドビュー ${(q.shoulder_x_diff ?? 0) >= 0.03 ? "✅" : "⚠️"} /
-          検出率 ${Math.round((q.detection_rate ?? 0) * 100)}% ${(q.detection_rate ?? 0) >= 0.7 ? "✅" : "⚠️"} /
-          足元 ${(q.foot_visibility ?? 0) >= 0.7 ? "✅" : "⚠️ 未検出(全身を映すと体軸も評価できます)"}
+          サイドビュー ${(q.shoulder_x_diff ?? 0) >= CAPTURE_QUALITY_THRESHOLDS.shoulder_x_diff ? "✅" : "⚠️"} /
+          検出率 ${Math.round((q.detection_rate ?? 0) * 100)}% ${(q.detection_rate ?? 0) >= CAPTURE_QUALITY_THRESHOLDS.detection_rate ? "✅" : "⚠️"} /
+          足元 ${(q.foot_visibility ?? 0) >= CAPTURE_QUALITY_THRESHOLDS.foot_visibility ? "✅" : "⚠️ 未検出(全身を映すと体軸も評価できます)"}
         </li>
       </ul>
     </section>

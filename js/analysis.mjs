@@ -613,6 +613,50 @@ export function computeCaptureQuality(data, wristName, throwFrames) {
   };
 }
 
+// computeCaptureQuality と同じ基準値。report.mjs のレポート画面(事後警告)と
+// main.mjs のプリチェック(事前警告)の両方から参照し、基準のブレを防ぐ
+export const CAPTURE_QUALITY_THRESHOLDS = { shoulder_x_diff: 0.03, detection_rate: 0.7, foot_visibility: 0.7 };
+
+export function captureQualityIssues(q) {
+  const issues = [];
+  if ((q.shoulder_x_diff ?? 0) < CAPTURE_QUALITY_THRESHOLDS.shoulder_x_diff) issues.push("side_view");
+  if ((q.detection_rate ?? 0) < CAPTURE_QUALITY_THRESHOLDS.detection_rate) issues.push("detection_rate");
+  if ((q.foot_visibility ?? 0) < CAPTURE_QUALITY_THRESHOLDS.foot_visibility) issues.push("foot_visibility");
+  return issues;
+}
+
+/**
+ * 軽量プリチェック用: フル解析(投擲検出)の前に、動画の先頭数秒だけで
+ * 簡易的な撮影品質を判定する。利き手・投擲はまだ特定できていないため、
+ * computeCaptureQuality と違い「左右どちらか検出できていればOK」で近似する。
+ */
+export function computeQuickCaptureQuality(data) {
+  const frames = data.frames || [];
+  const shDiffs = [];
+  const footVis = [];
+  let nDetected = 0;
+  for (const f of frames) {
+    const ls = findPoint(f, "LEFT_SHOULDER");
+    const rs = findPoint(f, "RIGHT_SHOULDER");
+    if (ls && rs) shDiffs.push(Math.abs(ls.x - rs.x));
+
+    const wristVis = (f.points || [])
+      .filter((p) => p.name === "LEFT_WRIST" || p.name === "RIGHT_WRIST")
+      .map((p) => p.visibility ?? 0);
+    if (wristVis.some((v) => v >= 0.5)) nDetected++;
+
+    const ankleVis = (f.points || [])
+      .filter((p) => p.name === "LEFT_ANKLE" || p.name === "RIGHT_ANKLE")
+      .map((p) => p.visibility ?? 0);
+    if (ankleVis.length) footVis.push(Math.max(...ankleVis));
+  }
+  return {
+    shoulder_x_diff: shDiffs.length ? round(percentile(shDiffs, 75), 4) : null,
+    detection_rate: frames.length ? round(nDetected / frames.length, 3) : 0,
+    foot_visibility: footVis.length ? round(median(footVis), 3) : null,
+  };
+}
+
 /**
  * メイン: keypoints データ → セッション分析結果
  * record_session.main の分析部分に、再現度スコア(3投の相互類似度平均)を追加

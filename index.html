@@ -68,6 +68,22 @@
     </section>
   </div>
 
+  <!-- 撮影プリチェック(先頭数秒の構図に問題がありそうな時だけ表示) -->
+  <div id="screen-precheck" class="screen">
+    <section class="card">
+      <h2>⚠️ 動画の構図を確認してください</h2>
+      <p id="precheck-summary" class="note"></p>
+      <ul class="guide-list">
+        <li>投擲者の<b>利き手側</b>から撮影していますか?</li>
+        <li>投擲動作の通り道に<b>障害物</b>はありませんか?</li>
+        <li><b>全身</b>(特に足元)が映っていますか?</li>
+      </ul>
+      <p class="note">このまま解析すると、判定の精度が下がる可能性があります。</p>
+      <button id="btn-precheck-continue" class="btn primary">このまま解析する</button>
+      <button id="btn-precheck-retry" class="btn ghost">動画を選び直す</button>
+    </section>
+  </div>
+
   <!-- レポート画面 -->
   <div id="screen-report" class="screen">
     <div id="report-body"></div>
@@ -79,6 +95,6 @@
   </div>
 
   <!-- ?v= はキャッシュバスター。js/ 配下を変更したら main.mjs の APP_VERSION と合わせて全 import の ?v= を上げること -->
-  <script type="module" src="js/main.mjs?v=2026-08-31.5"></script>
+  <script type="module" src="js/main.mjs?v=2026-08-31.6"></script>
 </body>
 </html>

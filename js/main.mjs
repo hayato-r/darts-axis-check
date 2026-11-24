@@ -3,18 +3,28 @@
  * 動画選択 → 骨格推定(オンデバイス) → 分析 → レポート表示 → シェア画像
  */
 
-import { extractKeypoints, loadPoseLandmarker } from "./pose.mjs?v=2026-08-31.5";
-import { analyzeSession } from "./analysis.mjs?v=2026-08-31.5";
-import { renderReport, renderShareImage } from "./report.mjs?v=2026-08-31.5";
-import { loadHistory, appendSessionToHistory } from "./history.mjs?v=2026-08-31.5";
+import { extractKeypoints, loadPoseLandmarker } from "./pose.mjs?v=2026-08-31.6";
+import { analyzeSession, computeQuickCaptureQuality, captureQualityIssues } from "./analysis.mjs?v=2026-08-31.6";
+import { renderReport, renderShareImage } from "./report.mjs?v=2026-08-31.6";
+import { loadHistory, appendSessionToHistory } from "./history.mjs?v=2026-08-31.6";
 
 // 古いキャッシュ版が動いていないか画面上で確認するためのビルド版数。
 // js/ 配下を変更したら必ず上げること。
-export const APP_VERSION = "2026-08-31.5";
+export const APP_VERSION = "2026-08-31.6";
+
+// プリチェックで先頭何秒だけ見るか。短すぎると判定が不安定、長すぎると
+// 「軽量」の意味がなくなるため、3投を撮り始める前の構えが映る程度を想定
+const PRECHECK_SECONDS = 4;
+
+const PRECHECK_LABELS = {
+  side_view: "真横(サイドビュー)から撮れていない可能性があります",
+  detection_rate: "人物がうまく検出できていません(画角・明るさを確認してください)",
+  foot_visibility: "足元が映っていない可能性があります",
+};
 
 const $ = (id) => document.getElementById(id);
 
-const state = { result: null, lastKeypoints: null, videoUrl: null };
+const state = { result: null, lastKeypoints: null, videoUrl: null, pendingFile: null };
 
 function show(screenId) {
   for (const s of document.querySelectorAll(".screen")) s.classList.remove("active");
@@ -24,6 +34,37 @@ function show(screenId) {
 function setProgress(pct, label) {
   $("progress-fill").style.width = `${pct}%`;
   $("progress-label").textContent = label;
+}
+
+/**
+ * 動画選択直後に呼ぶ: 先頭数秒だけ解析して撮影品質を軽くチェックする。
+ * 問題がなければそのままフル解析(runPipeline)へ、問題があれば
+ * プリチェック画面で「このまま解析する/選び直す」を選ばせる。
+ */
+async function handleFileSelected(file) {
+  $("error-box").hidden = true;
+  show("screen-progress");
+  setProgress(2, "AIモデルを読み込み中…(初回は少し時間がかかります)");
+  try {
+    await loadPoseLandmarker();
+    setProgress(10, "撮影状態を確認中…");
+    const preview = await extractKeypoints(file, () => {}, { maxSeconds: PRECHECK_SECONDS });
+    const quality = computeQuickCaptureQuality(preview);
+    const issues = captureQualityIssues(quality);
+
+    if (issues.length) {
+      state.pendingFile = file;
+      $("precheck-summary").innerHTML = issues.map((i) => "・" + PRECHECK_LABELS[i]).join("<br>");
+      show("screen-precheck");
+      return;
+    }
+    await runPipeline(file);
+  } catch (e) {
+    // プリチェック自体の失敗(タイムアウト等)は致命的でない。
+    // 事前チェックをスキップしてフル解析にそのまま進む(事後警告は引き続き機能する)
+    console.warn("プリチェックに失敗、フル解析へフォールバック:", e.message || e);
+    await runPipeline(file);
+  }
 }
 
 async function runPipeline(file) {
@@ -113,10 +154,18 @@ function init() {
   $("video-input").addEventListener("change", (e) => {
     const file = e.target.files && e.target.files[0];
     if (file) {
-      $("error-box").hidden = true;
-      runPipeline(file);
+      handleFileSelected(file);
       e.target.value = ""; // 同じファイルの再選択を可能に
     }
+  });
+  $("btn-precheck-continue").addEventListener("click", () => {
+    const file = state.pendingFile;
+    state.pendingFile = null;
+    if (file) runPipeline(file);
+  });
+  $("btn-precheck-retry").addEventListener("click", () => {
+    state.pendingFile = null;
+    show("screen-input");
   });
   $("btn-share").addEventListener("click", shareImage);
   $("btn-debug").addEventListener("click", () => {
